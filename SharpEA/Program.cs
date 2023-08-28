@@ -1,8 +1,10 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using static SharpEA.Program;
 
 namespace SharpEA
 {
@@ -20,20 +22,32 @@ namespace SharpEA
             public byte EaNameLength; // 1 bytes
             public short EaValueLength; // 2 bytes
             public fixed byte EaContent[MAX_EA_VALUE_SIZE];
-            // public IntPtr EaContent;
         }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 0)]
+        public struct _FILE_FULL_EA_INFORMATION_v2
+        {
+            public int NextEntryOffset; //4 bytes
+            public byte Flags; // 1 bytes
+            public byte EaNameLength; // 1 bytes
+            public short EaValueLength; // 2 bytes
+            public byte b1;
+            public byte b2;
+            public byte b3;
+            public byte b4;
+        }
+
 
         [DllImport("ntdll.dll", CharSet = CharSet.Unicode)]
         public static extern NtStatus ZwSetEaFile(
             SafeFileHandle FileHandle,
             out IO_STATUS_BLOCK IoStatusBlock,
-            _FILE_FULL_EA_INFORMATION Buffer,
+            IntPtr Buffer,
             int Length
         );
         
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern SafeFileHandle CreateFileW([MarshalAs(UnmanagedType.LPWStr)] string filename, uint access, int share, IntPtr securityAttributes, int creationDisposition, int flagsAndAttributes, IntPtr templateFile);
         [DllImport("kernel32.dll")] static extern uint GetLastError();
-        // [DllImport("kernel32.dll", SetLastError = true)] static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
         // [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] static extern bool CloseHandle(IntPtr hObject);
         [DllImport("ntdll.dll")] public static extern NtStatus ZwQueryEaFile(SafeFileHandle handle, out IO_STATUS_BLOCK ioStatus, out _FILE_FULL_EA_INFORMATION buffer, int length, bool retSingleEntry, IntPtr eaList, uint eaListLength, uint eaIndex, bool restartScan);
 
@@ -181,55 +195,53 @@ namespace SharpEA
         {
             String ea_filename = args[0];
 
-            if (args.Length > 1) {
+            if (args[1] == "read") {
                 read(ea_filename);
+                return;
             }
             
-            /*
-            public unsafe struct _FILE_FULL_EA_INFORMATION
-            {
-                public int NextEntryOffset; //4 bytes
-                public byte Flags; // 1 bytes
-                public byte EaNameLength; // 1 bytes
-                public short EaValueLength; // 2 bytes
-                public fixed byte EaContent[MAX_EA_VALUE_SIZE];
-            } 
-            */
 
             Console.WriteLine("\n[+] Writting... ");
-            unsafe {
-                IO_STATUS_BLOCK IoStatusBlock2;
-                _FILE_FULL_EA_INFORMATION ffeai;
-                ffeai.NextEntryOffset = 0;
-                byte flag = (byte)0;
-                ffeai.Flags = flag;
-                byte name_length = (byte)1;
-                ffeai.EaNameLength = name_length;
-                short value_length = (short)1;
-                ffeai.EaValueLength = value_length;
-                // ffeai.EaContent = (IntPtr) 49344;
+
+            unsafe
+            {
+                IO_STATUS_BLOCK IoStatusBlock;
+                _FILE_FULL_EA_INFORMATION_v2 ffeai;
+                //_FILE_FULL_EA_INFORMATION ffeai;
+
+                String ea_name = args[1];
+                String ea_value = args[2];
+
+                ffeai.NextEntryOffset = (int)0;
+                ffeai.Flags = (byte)0;
+                ffeai.EaNameLength = (byte)(ea_name.Length);
+                ffeai.EaValueLength = (short)(ea_value.Length);
+                    
+                ffeai.b1 = Convert.ToByte('A');
+                ffeai.b2 = 0;
+                ffeai.b3 = Convert.ToByte('r');
+                ffeai.b4 = 0;
+
                 // byte[] test =  { 0x36, 0x67, 0x73, 0x46, 0x67, 0x65, 0x84, 0x65, 0x76, 0x79, 0x71, 0x72, 0x73, 0x78, 0x84, 0x0, 0x36, 0x36, 0x67, 0x73, 0x46, 0x67, 0x65, 0x84, 0x65, 0x76, 0x79, 0x71, 0x72, 0x73, 0x78, 0x84 };
-                /*
-                Byte bArr[] = {1, 2, 3};
-                Byte* pbArr = &bArr[0];
-                 */
-                // ffeai.EaContent = (byte*) &test;
-                SafeFileHandle file_handle = CreateFileW(ea_filename, GENERIC_WRITE, 0, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
+                // byte[] test = new byte[256]{ 0x36, 0x67, 0x73, 0x46, 0x67, 0x65, 0x84, 0x65, 0x76, 0x79, 0x71, 0x72, 0x73, 0x78, 0x84, 0x0, 0x36, 0x36, 0x67, 0x73, 0x46, 0x67, 0x65, 0x84, 0x65, 0x76, 0x79, 0x71, 0x72, 0x73, 0x78, 0x84, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
+                SafeFileHandle file_handle = CreateFileW(ea_filename, GENERIC_WRITE | FILE_ALL_ACCESS, 0, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
                 if (file_handle.IsInvalid)
                 {
                     Console.WriteLine("[-] Invalid handle. Error code: " + GetLastError());
                     System.Environment.Exit(-1);
                 }
 
-                int size = 8;
-                NtStatus status1 = ZwSetEaFile(file_handle, out IoStatusBlock2, ffeai, size);
-                Console.WriteLine("[+] NtStatus: " + status1 + " \t0x" + status1.ToString("X"));
+                int size = Marshal.SizeOf(typeof(_FILE_FULL_EA_INFORMATION_v2));
+                Console.WriteLine("[+] Size:     " + size);
 
+                IntPtr ffeai_pointer = (IntPtr)(&ffeai);
+                Console.WriteLine("[+] Pointer:  " + ffeai_pointer);
+
+                NtStatus status1 = ZwSetEaFile(file_handle, out IoStatusBlock, ffeai_pointer, size);
+                Console.WriteLine("[+] NtStatus: " + (NtStatus)status1 + " \t0x" + status1.ToString("X"));
+                Console.WriteLine("[+] IoStatusBlock.NtStatus:      " + IoStatusBlock.status);
+                Console.WriteLine("[+] IoStatusBlock.information:   " + IoStatusBlock.information);
             }
-
-            // Thread.Sleep(1000);
-            // System.Environment.Exit(0);
-
         }
     }
 }
