@@ -334,19 +334,54 @@ namespace SharpEA
         }
 
 
+        static void getHelp()
+        {
+            Console.WriteLine("[+] SharpEA.exe [option] (args) ");
+            Console.WriteLine("");
+
+            Console.WriteLine("[+] SharpEA.exe list FILE_PATH");
+            Console.WriteLine("[+] Example: SharpEA.exe list c:\\windows\\system32\\kernel32.dll");
+            Console.WriteLine("");
+
+            Console.WriteLine("[+] SharpEA.exe write FILE_PATH EA_NAME PAYLOAD");
+            Console.WriteLine("[+] Example (string):      SharpEA.exe write c:\\Temp\\test.txt EA_name1 RandomString");
+            Console.WriteLine("[+] Example (hexadecimal): SharpEA.exe write c:\\Temp\\test.txt EA_name2 0x4142434445");
+            Console.WriteLine("[+] Example (from url):    SharpEA.exe write c:\\Temp\\test.txt EA_name3 http://127.0.0.1:8000/payload.bin");
+            Console.WriteLine("");
+
+            Console.WriteLine("[+] SharpEA.exe delete FILE_PATH EA_NAME");
+            Console.WriteLine("[+] Example: SharpEA.exe delete c:\\Temp\\test.txt EA_name1");
+            Console.WriteLine("");
+
+            Console.WriteLine("[+] SharpEA.exe clear FILE_PATH");
+            Console.WriteLine("[+] Example: SharpEA.exe clear c:\\Temp\\test.txt");
+
+            System.Environment.Exit(0);
+        }
+
+
         static void Main(string[] args)
         {
+            if (args.Length < 2)
+            {
+                getHelp();
+            }
+            String option = args[0];
             String ea_filename = args[1];
 
-            if (args[0] == "list")
+            if (option == "list")
             {
                 Console.WriteLine("[+] Listing EAs...");
                 read(ea_filename);
                 return;
             }
 
-            else if (args[0] == "write")
+            else if (option == "write")
             {
+                if (args.Length < 4)
+                {
+                    getHelp();
+                }
                 String ea_name_str = args[2];
                 String ea_value_str = args[3];
                 Console.WriteLine("[+] Writting content to EA with name \"{0}\"...", ea_name_str);
@@ -354,21 +389,29 @@ namespace SharpEA
                 return;
             }
 
-            else if (args[0] == "delete")
+            else if (option == "delete")
             {
+                if (args.Length < 3)
+                {
+                    getHelp();
+                }
                 String ea_name_str = args[2];
                 Console.WriteLine("[+] Deleting EA with name \"{0}\"...", ea_name_str);
                 writeEA(ea_filename, ea_name_str, "");
                 return;
             }
 
-            else if (args[0] == "clear")
+            else if (option == "clear")
             {
                 Console.WriteLine("[+] Clearing EAs...");
                 clearEAs(ea_filename);
                 return;
             }
 
+            else
+            {
+                getHelp();
+            }
         }
     }
 }
