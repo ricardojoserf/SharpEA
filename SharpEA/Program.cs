@@ -9,7 +9,7 @@ namespace SharpEA
     internal class Program
     {
         // Max number of bytes to retrieve for all EAs
-        const int MAX_EA_VALUE_SIZE = 1024;
+        const int MAX_EA_VALUE_SIZE = 1024 * 64 - 24;
         const int OPEN_EXISTING = 3;
         const int FILE_READ_EA = 8;
         const int FILE_WRITE_EA = 16;
@@ -284,9 +284,9 @@ namespace SharpEA
             NtStatus status1 = ZwSetEaFile(file_handle, out IoStatusBlock, ffeai_pointer, (8 + ea_content_arr_size));
 
             if (debug) {
-                Console.WriteLine("[+] Pointer:  " + ffeai_pointer);
-                Console.WriteLine("[+] Size:     " + (8 + ea_content_arr_size));
-                Console.WriteLine("[+] NtStatus: " + (NtStatus)status1 + " \t0x" + status1.ToString("X"));
+                // Console.WriteLine("[+] Pointer:  " + ffeai_pointer);
+                // Console.WriteLine("[+] Size:     " + (8 + ea_content_arr_size));
+                Console.WriteLine("[+] NtStatus:                    " + (NtStatus)status1);
                 Console.WriteLine("[+] IoStatusBlock.NtStatus:      " + IoStatusBlock.status);
                 Console.WriteLine("[+] IoStatusBlock.information:   " + IoStatusBlock.information);
             }
