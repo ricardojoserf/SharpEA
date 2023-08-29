@@ -1,6 +1,6 @@
 # SharpEA
 
-C#program to read, write and delete Extended Attributes (EAs) to "hide" malicious payloads within NTFS filesystems.
+C# program to read, write and delete Extended Attributes (EAs) to "hide" malicious payloads within NTFS filesystems.
 
 ### List EAs
 
