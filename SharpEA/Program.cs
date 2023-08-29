@@ -23,12 +23,16 @@ namespace SharpEA
         [DllImport("ntdll.dll")] public static extern NtStatus ZwQueryEaFile(SafeFileHandle handle, out IO_STATUS_BLOCK ioStatus, out _FILE_FULL_EA_INFORMATION buffer, int length, bool retSingleEntry, IntPtr eaList, uint eaListLength, uint eaIndex, bool restartScan);
 
 
-        static void readEA(byte[] data, int offset, int ea_name_length, int ea_value_length)
+        static String readEA(byte[] data, int offset, int ea_name_length, int ea_value_length, bool debug = false)
         {
             // Ea Name
             byte[] name_bytes = data.Skip(offset).Take(ea_name_length).ToArray();
             var name_str = System.Text.Encoding.Default.GetString(name_bytes);
-            Console.WriteLine("[+] EA Name: " + name_str);
+            if (debug)
+            {
+                Console.WriteLine("[+] EA Name:                     {0}", name_str);
+                Console.WriteLine("[+] EA Content: ");
+            }
             // EA Value
             for (int i = (offset + ea_name_length + 1); i < (offset + ea_name_length + 1 + ea_value_length); i = i + 8)
             {
@@ -46,8 +50,11 @@ namespace SharpEA
                         value_str += ".";
                     }
                 }
-                Console.WriteLine("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t\t{8}", data[i].ToString("X"), data[i + 1].ToString("X"), data[i + 2].ToString("X"), data[i + 3].ToString("X"), data[i + 4].ToString("X"), data[i + 5].ToString("X"), data[i + 6].ToString("X"), data[i + 7].ToString("X"), value_str);
+                if (debug) {
+                    Console.WriteLine("{0}   {1}   {2}   {3}   {4}   {5}   {6}   {7}\t\t{8}", data[i].ToString("X2"), data[i + 1].ToString("X2"), data[i + 2].ToString("X2"), data[i + 3].ToString("X2"), data[i + 4].ToString("X2"), data[i + 5].ToString("X2"), data[i + 6].ToString("X2"), data[i + 7].ToString("X2"), value_str);
+                }
             }
+            return name_str;
         }
 
 
@@ -66,12 +73,12 @@ namespace SharpEA
             int ea_value_length = (int)ea_value_length_short;
 
             Console.WriteLine("");
-            Console.WriteLine("[+] NextEntryOffset:             {0}  \t(0x{1})", next_entry_int, next_entry_int.ToString("x"));
-            Console.WriteLine("[+] Flags:                       {0}  \t(0x{1})", flags, flags.ToString("x"));
-            Console.WriteLine("[+] EaNameLength:                {0}  \t(0x{1})", ea_name_length, ea_name_length.ToString("x"));
-            Console.WriteLine("[+] EaValueLength:               {0}  \t(0x{1})", ea_value_length, ea_value_length.ToString("x"));
+            Console.WriteLine("[+] NextEntryOffset:             {0} (0x{1})", next_entry_int, next_entry_int.ToString("x"));
+            Console.WriteLine("[+] Flags:                       {0} (0x{1})", flags, flags.ToString("x"));
+            Console.WriteLine("[+] EaNameLength:                {0} (0x{1})", ea_name_length, ea_name_length.ToString("x"));
+            Console.WriteLine("[+] EaValueLength:               {0} (0x{1})", ea_value_length, ea_value_length.ToString("x"));
 
-            readEA(data, offset, ea_name_length, ea_value_length);
+            readEA(data, offset, ea_name_length, ea_value_length, true);
 
             return next_entry_int;
         }
@@ -87,7 +94,6 @@ namespace SharpEA
             }
 
             // Query EA
-            Console.WriteLine("\n[+] Reading...\n");
             IO_STATUS_BLOCK IoStatusBlock;
             int buff_size = 8 + MAX_EA_VALUE_SIZE;
             _FILE_FULL_EA_INFORMATION ffeai = new _FILE_FULL_EA_INFORMATION();
@@ -95,7 +101,7 @@ namespace SharpEA
 
             if (status == NtStatus.NoEasOnFile)
             {
-                Console.WriteLine("[+] No Extended Attributes in this file");
+                Console.WriteLine("[+] No Extended Attributes (EAs) in this file");
                 System.Environment.Exit(0);
             }
 
@@ -132,15 +138,15 @@ namespace SharpEA
             }
             */
 
-            Console.WriteLine("[+] NtStatus:                    " + status);
-            Console.WriteLine("[+] IoStatusBlock.NtStatus:      " + IoStatusBlock.status);
-            Console.WriteLine("[+] IoStatusBlock.information:   " + IoStatusBlock.information);
-            Console.WriteLine("[+] NextEntryOffset:             {0}  \t(0x{1})", next_entry, ffeai.NextEntryOffset.ToString("x"));
-            Console.WriteLine("[+] Flags:                       {0}  \t(0x{1})", ffeai.Flags, ffeai.Flags.ToString("x"));
-            Console.WriteLine("[+] EaNameLength:                {0}  \t(0x{1})", ea_name_length, ea_name_length.ToString("x"));
-            Console.WriteLine("[+] EaValueLength:               {0}  \t(0x{1})", ea_value_length, ea_value_length.ToString("x"));
+            Console.WriteLine("[+] NtStatus:                    {0}", status);
+            Console.WriteLine("[+] IoStatusBlock.NtStatus:      {0}", IoStatusBlock.status);
+            Console.WriteLine("[+] IoStatusBlock.information:   {0} (0x{1})\n", IoStatusBlock.information, IoStatusBlock.information.ToString("X"));
+            Console.WriteLine("[+] NextEntryOffset:             {0} (0x{1})", next_entry, ffeai.NextEntryOffset.ToString("x"));
+            Console.WriteLine("[+] Flags:                       {0} (0x{1})", ffeai.Flags, ffeai.Flags.ToString("x"));
+            Console.WriteLine("[+] EaNameLength:                {0} (0x{1})", ea_name_length, ea_name_length.ToString("x"));
+            Console.WriteLine("[+] EaValueLength:               {0} (0x{1})", ea_value_length, ea_value_length.ToString("x"));
 
-            readEA(ea_content_arr, 0, ea_name_length, ea_value_length);
+            readEA(ea_content_arr, 0, ea_name_length, ea_value_length, true);
 
             if (next_entry == 0)
             {
@@ -158,25 +164,91 @@ namespace SharpEA
         }
 
 
-        static void writeEA(String ea_filename, String ea_name_str, String ea_value_str)
+        public static byte[] ToByteArray(String hexString)
         {
-            Console.WriteLine("\n[+] Writting... ");
+            byte[] retval = new byte[hexString.Length / 2];
+            for (int i = 0; i < hexString.Length; i += 2)
+                retval[i / 2] = Convert.ToByte(hexString.Substring(i, 2), 16);
+            return retval;
+        }
+
+
+        static byte[] getPayload(String payload_str)
+        {
+            byte[] buf = { };
+
+            // Hexadecimal payload
+            if (payload_str.Length >= 2)
+            {
+                if (payload_str.Substring(0, 2) == "0x")
+                {
+                    try
+                    {
+                        payload_str = payload_str.Replace("0x", "");
+                        buf = ToByteArray(payload_str);
+                        return buf;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("[-] Failure trying to decode hexadecimal payload.");
+                        Console.WriteLine(ex.ToString());
+                        System.Environment.Exit(-1);
+                    }
+                }
+            }
+
+            // Payload from url, http or https
+            if (payload_str.Length >= 4)
+            {
+                if (payload_str.Substring(0, 4) == "http")
+                {
+                    Console.WriteLine("[+] Getting payload from url: " + payload_str);
+                    System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+                    System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
+                    using (System.Net.WebClient myWebClient = new System.Net.WebClient())
+                    {
+                        try
+                        {
+                            System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+                            buf = myWebClient.DownloadData(payload_str);
+                            return buf;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[-] Failure trying to download the file from url: {0}.", payload_str);
+                            Console.WriteLine(ex.ToString());
+                            System.Environment.Exit(-1);
+                        }
+                    }
+                }
+            }
+
+            // Regular payload 
+            buf = System.Text.Encoding.ASCII.GetBytes(payload_str);
+            return buf;
+        }
+
+
+        static void writeEA(String ea_filename, String ea_name_str, String ea_value_str, bool debug = false)
+        {
             IO_STATUS_BLOCK IoStatusBlock;
             _FILE_FULL_EA_INFORMATION ffeai;
 
             ffeai.NextEntryOffset = 0;
             ffeai.Flags = 0;
-            ffeai.EaNameLength = (byte)ea_name_str.Length;
-            ffeai.EaValueLength = (short)ea_value_str.Length;
-            Console.WriteLine("EaNameLength:  " + ffeai.EaNameLength);
-            Console.WriteLine("EaValueLength: " + ffeai.EaValueLength);
 
-            int ea_content_arr_size = ea_name_str.Length + 1 + ea_value_str.Length;
-            byte[] ea_content_arr = new byte[ea_content_arr_size];
-
+            // Name
             byte[] ea_name_bytearr = System.Text.Encoding.Default.GetBytes(ea_name_str);
-            byte[] ea_value_bytearr = System.Text.Encoding.Default.GetBytes(ea_value_str);
+            ffeai.EaNameLength = (byte)ea_name_str.Length;
+
+            // Value
+            byte[] ea_value_bytearr = getPayload(ea_value_str); // System.Text.Encoding.Default.GetBytes(ea_value_str);
+            ffeai.EaValueLength = (short)ea_value_bytearr.Length;
+
+            // Build byte array eaname + eavalue
             byte[] aux_bytearr = { (byte)0 };
+            int ea_content_arr_size = ea_name_str.Length + 1 + ea_value_bytearr.Length;
+            byte[] ea_content_arr = new byte[ea_content_arr_size];
 
             System.Buffer.BlockCopy(ea_name_bytearr, 0, ea_content_arr, 0, ea_name_bytearr.Length);
             System.Buffer.BlockCopy(aux_bytearr, 0, ea_content_arr, ea_name_bytearr.Length, aux_bytearr.Length);
@@ -190,30 +262,75 @@ namespace SharpEA
                 System.Environment.Exit(-1);
             }
 
+            IntPtr ffeai_pointer = IntPtr.Zero;
+
             unsafe
             {
+                // Copy the EA content to the address of ffeai.EaContent
+                // Pointer to the ffeai.EaContent (we need unsafe)
                 byte* p = ffeai.EaContent;
-                IntPtr ptr = (IntPtr)p;
-                Console.WriteLine("ffeai.test address: \t0x" + ptr.ToString("X"));
-
-                // Copy to the EA content to the address of ffeai.EaContent
+                IntPtr ptr = (IntPtr)p;                
                 foreach (byte b in ea_content_arr)
                 {
                     *p = b;
                     p += 1;
                 }
 
-                // Pointer to the _FILE_FULL_EA_INFORMATION struct
-                IntPtr ffeai_pointer = (IntPtr)(&ffeai);
+                // Pointer to the structure (we need unsafe)
+                ffeai_pointer = (IntPtr)(&ffeai);
+            }
+
+            // Call ZwSetEaFile
+            NtStatus status1 = ZwSetEaFile(file_handle, out IoStatusBlock, ffeai_pointer, (8 + ea_content_arr_size));
+
+            if (debug) {
                 Console.WriteLine("[+] Pointer:  " + ffeai_pointer);
                 Console.WriteLine("[+] Size:     " + (8 + ea_content_arr_size));
-
-                // Call ZwSetEaFile
-                NtStatus status1 = ZwSetEaFile(file_handle, out IoStatusBlock, ffeai_pointer, (8 + ea_content_arr_size));
                 Console.WriteLine("[+] NtStatus: " + (NtStatus)status1 + " \t0x" + status1.ToString("X"));
                 Console.WriteLine("[+] IoStatusBlock.NtStatus:      " + IoStatusBlock.status);
                 Console.WriteLine("[+] IoStatusBlock.information:   " + IoStatusBlock.information);
             }
+            
+        }
+
+
+        static void clearEAs(String ea_filename) {
+            SafeFileHandle file_handle = CreateFileW(ea_filename, FILE_READ_EA, 0, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
+            if (file_handle.IsInvalid)
+            {
+                Console.WriteLine("[-] Invalid handle. Error code: " + GetLastError());
+                System.Environment.Exit(-1);
+            }
+
+            while (true) {
+                // Query EA
+                IO_STATUS_BLOCK IoStatusBlock;
+                int buff_size = 8 + MAX_EA_VALUE_SIZE;
+                _FILE_FULL_EA_INFORMATION ffeai = new _FILE_FULL_EA_INFORMATION();
+                NtStatus status = ZwQueryEaFile(file_handle, out IoStatusBlock, out ffeai, buff_size, false, IntPtr.Zero, 0, 0, true);
+
+                if (status == NtStatus.NoEasOnFile)
+                {
+                    Console.WriteLine("[+] All Extended Attributes (EAs) were cleared.");
+                    System.Environment.Exit(0);
+                }
+
+                int ea_name_length = ffeai.EaNameLength;
+                int ea_value_length = ffeai.EaValueLength;
+                int next_entry = ffeai.NextEntryOffset;
+
+                byte[] ea_content_arr;
+                unsafe
+                {
+                    ea_content_arr = new byte[MAX_EA_VALUE_SIZE];
+                    Marshal.Copy((IntPtr)ffeai.EaContent, ea_content_arr, 0, MAX_EA_VALUE_SIZE);
+                }
+
+                String ea_name = readEA(ea_content_arr, 0, ea_name_length, ea_value_length);
+                Console.WriteLine("[+] Deleting EA with name \"{0}\"",ea_name);
+                writeEA(ea_filename, ea_name, "");
+            }
+
         }
 
 
@@ -223,6 +340,7 @@ namespace SharpEA
 
             if (args[0] == "list")
             {
+                Console.WriteLine("[+] Listing EAs...");
                 read(ea_filename);
                 return;
             }
@@ -231,14 +349,23 @@ namespace SharpEA
             {
                 String ea_name_str = args[2];
                 String ea_value_str = args[3];
-                writeEA(ea_filename, ea_name_str, ea_value_str);
+                Console.WriteLine("[+] Writting content to EA with name \"{0}\"...", ea_name_str);
+                writeEA(ea_filename, ea_name_str, ea_value_str, true);
                 return;
             }
 
             else if (args[0] == "delete")
             {
                 String ea_name_str = args[2];
+                Console.WriteLine("[+] Deleting EA with name \"{0}\"...", ea_name_str);
                 writeEA(ea_filename, ea_name_str, "");
+                return;
+            }
+
+            else if (args[0] == "clear")
+            {
+                Console.WriteLine("[+] Clearing EAs...");
+                clearEAs(ea_filename);
                 return;
             }
 
